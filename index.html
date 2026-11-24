@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Starwake</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M28 16 L6 27 L10 16 L6 5 Z%27 fill=%27%23e4572e%27 stroke=%27%2318202e%27 stroke-width=%272%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -79,7 +80,7 @@ const SY=['ka','ru','vel','os','tir','ne','mau','dra','qi','lon','sef','ar','um'
 function mkName(r){let n='';const k=2+(r()<.35?1:0);for(let i=0;i<k;i++)n+=SY[Math.floor(r()*SY.length)];return n[0].toUpperCase()+n.slice(1)}
 const ri=(r,a,b)=>a+Math.floor(r()*(b-a+1));
 
-const HX=900,HY=100,DAYRATE=2.4,R0=50,FUELK=8;
+const HX=900,HY=100,DAYRATE=2.4,R0=50,FUELK=8,PRICE=8,HAVENPRICE=5;
 const RACES={
  vellani:{name:'Vellani Registry',short:'Vellani',col:'#2f6f9f'},
  ossiri:{name:'Ossiri Toll Ring',short:'Ossiri',col:'#b8791f'},
@@ -131,7 +132,7 @@ function newGame(seed){
  let pi=0;[['part',.1],['lore1',.28],['seed',.45],['part',.55],['lore2',.66],['part',.78]].forEach(([k,p])=>{const s=take(p);s.kind='dead';s.relic=k;if(k==='part')s.pi=pi++});
  const RN=['I','II','III','IV'];
  stars.forEach(s=>{if(!['plain','dead','home'].includes(s.kind))return;const n=ri(r,1,s.kind==='plain'?4:2);for(let i=0;i<n;i++){const ty=PTK[Math.floor(r()*PTK.length)],d=PTYPES[ty];s.planets.push({name:s.name+' '+RN[i],type:ty,min:d.min?ri(r,d.min[0],d.min[1]):0,fuel:d.fuel?ri(r,d.fuel[0],d.fuel[1]):0,done:false})}});
- return {v:1,seed,day:0,fuel:80,fuelMax:100,crew:12,crewMax:18,credits:120,min:0,cargo:100,batMax:24,thrust:0,dmg:1,at:0,allies:[],parts:0,hasSeed:false,ups:[],visited:[0],known:[0,1,near.id],msg:[],over:null,travel:null,stars,flags:{}};
+ return {v:1,seed,day:0,fuel:80,fuelMax:100,crew:12,crewMax:18,credits:200,min:0,cargo:100,batMax:24,thrust:0,dmg:1,at:0,allies:[],parts:0,hasSeed:false,ups:[],visited:[0],known:[0,1,near.id],msg:[],over:null,travel:null,stars,flags:{}};
 }
 function log(t){G.msg.unshift(t);if(G.msg.length>30)G.msg.length=30}
 function save(){try{localStorage.setItem('starwake-v1',JSON.stringify(G))}catch(e){}}
@@ -326,7 +327,8 @@ const ACT={
  do:i=>{const a=UI.acts&&UI.acts[+i];if(!a||a.ok===false)return;UI.acts=null;a.fn();if(!C)after()},
  back:()=>{UI.mode='sys';UI.acts=null;UI.dice=null;renderPanel()},
  trade:()=>{UI.mode='trade';renderPanel()},
- sell:()=>{if(!G.min)return;G.credits+=G.min*5;log(`Sold ${G.min} minerals for ${G.min*5} credits.`);G.min=0;after()},
+ sell:()=>{if(!G.min)return;G.credits+=G.min*PRICE;log(`Sold ${G.min} minerals for ${G.min*PRICE} credits.`);G.min=0;after()},
+ sellhaven:()=>{if(!G.min)return;G.credits+=G.min*HAVENPRICE;log(`Haven Yard bought ${G.min} minerals for ${G.min*HAVENPRICE} credits.`);G.min=0;after()},
  fuel:()=>{const need=Math.floor(G.fuelMax-G.fuel),n=Math.min(need,Math.floor(G.credits/3));if(n<=0)return;G.fuel+=n;G.credits-=n*3;after()},
  charts:()=>{if(G.flags.charts||G.credits<80)return;G.credits-=80;G.flags.charts=1;G.stars.forEach(s=>{if((s.kind==='home'||s.kind==='station')&&!G.known.includes(s.id))G.known.push(s.id)});log('The Ossiri charts mark every homeworld and toll ring. Ruins, they say, are not for sale. Nobody ever comes back to complain about them.');after()},
  up:id=>{const u=UPS.find(x=>x.id===id);if(!u||G.ups.includes(id)||G.credits<u.cost)return;G.credits-=u.cost;G.ups.push(id);u.fn();log(`Installed ${u.name.toLowerCase()}.`);after()},
@@ -347,8 +349,14 @@ function kindLine(s){return s.kind==='haven'?'Your home yard':s.kind==='heart'?'
 const logH=()=>`<div class="card log"><h3>Captain's log</h3>${G.msg.slice(0,6).map(m=>`<p>${esc(m)}</p>`).join('')||'<p>Nothing yet.</p>'}</div>`;
 const btn=(act,label,arg,dis,pri)=>`<button class="${pri?'pri':''}" data-act="${act}"${arg!=null?` data-arg="${esc(arg)}"`:''}${dis?' disabled':''}>${esc(label)}</button>`;
 function destCard(){
- const t=S(UI.sel),c=S(G.at),d=dist(c,t),f=d/FUELK,days=Math.max(1,Math.round(d/SPEED())),kn=G.known.includes(t.id),no=f>G.fuel;
- return `<div class="card"><h3>Course to ${esc(t.name)}</h3><p class="sub">${kn?esc(kindLine(t)):'Uncharted'}${consumed(t)?', inside the Bloom':''}</p><p>${Math.ceil(f)} fuel, about ${days} days.</p>${no?'<p class="warn">Not enough fuel for this jump.</p>':''}<div class="row">${btn('jump','Jump',null,no,true)}${btn('clear','Cancel')}</div></div>`;
+ const t=S(UI.sel),c=S(G.at),d=dist(c,t),f=d/FUELK,arr=G.day+d/SPEED(),days=Math.floor(arr)-Math.floor(G.day),kn=G.known.includes(t.id),no=f>G.fuel;
+ const rArr=R0+arr*DAYRATE,inside=t.kind!=='heart'&&dH(t)<rArr,edge=!inside&&t.kind!=='heart'&&dH(t)-rArr<140;
+ let warn='';
+ if(t.kind==='heart'&&!(G.parts>=3&&G.allies.length>=3))warn='The Heart is guarded by four scouts, and you cannot hurt it yet.';
+ else if(inside)warn=`By the time you arrive, ${esc(t.name)} will be inside the Bloom. Three scouts will attack on arrival. You can flee once your battery is full.`;
+ else if(edge)warn='This system sits near the edge of the Bloom. Scouts attack about half the time on arrival.';
+ if(warn&&G.crew<8)warn+=` You have only ${G.crew} crew. Hire more at Haven or a toll ring first.`;
+ return `<div class="card"><h3>Course to ${esc(t.name)}</h3><p class="sub">${kn?esc(kindLine(t)):'Uncharted'}</p><p>${Math.ceil(f)} fuel, ${days} day${days===1?'':'s'}, arriving on day ${Math.floor(arr)}.</p>${warn?`<p class="warn">${warn}</p>`:''}${no?'<p class="warn">Not enough fuel for this jump.</p>':''}<div class="row">${btn('jump',inside?'Jump into the Bloom':'Jump',null,no,true)}${btn('clear','Cancel')}</div></div>`;
 }
 function renderSys(){
  if(G.travel){const t=S(G.travel.to);panel.innerHTML=`<h2>In transit</h2><p class="sub">Bound for ${esc(t.name)}. The days slip by, and the grey keeps growing.</p>`+logH();return}
@@ -356,7 +364,7 @@ function renderSys(){
  if(UI.sel!=null&&UI.sel!==G.at)h+=destCard();
  h+=`<h2>${esc(s.name)}</h2><p class="sub">${esc(kindLine(s))}</p>`;
  if(gone)h+=`<p class="warn">This system is inside the Bloom.</p>`;
- if(s.kind==='haven'){const n=G.crewMax-G.crew;h+=`<div class="card"><h3>Haven Yard</h3><p>The yard crews top off your tanks for free and will sign on new hands at 8 credits each.</p><div class="row">${btn('refuel','Refuel free',null,G.fuel>=G.fuelMax)}${btn('hire','Hire 1 crew','8',!n||G.credits<8)}${btn('hirefull','Hire to full','8',!n||G.credits<8)}</div></div>`}
+ if(s.kind==='haven'){const n=G.crewMax-G.crew;h+=`<div class="card"><h3>Haven Yard</h3><p>The yard crews top off your tanks for free, sign on new hands at 8 credits each, and buy minerals at ${HAVENPRICE} credits each. The Ossiri pay ${PRICE}.</p><div class="row">${btn('refuel','Refuel free',null,G.fuel>=G.fuelMax)}${btn('sellhaven',`Sell ${G.min} minerals for ${G.min*HAVENPRICE} cr`,null,!G.min)}${btn('hire','Hire 1 crew','8',!n||G.credits<8)}${btn('hirefull','Hire to full','8',!n||G.credits<8)}</div></div>`}
  if(s.kind==='station'||(s.kind==='home'&&s.race==='ossiri'))h+=`<div class="row">${btn('trade','Open trade',null,gone,true)}</div>`;
  if(s.kind==='home'){if(gone&&!G.allies.includes(s.race))h+=`<p>The homeworld is grey and silent.</p>`;else h+=`<div class="row">${btn('hail',`Hail the ${RACES[s.race].short}`,null,false,true)}${G.allies.includes(s.race)?`<span class="badge" style="background:${RACES[s.race].col};align-self:center">Allied</span>`:''}</div>`}
  if(s.kind==='dead')h+=`<div class="card"><h3>Ruins</h3>${s.taken?'<p class="sub">You have already picked these ruins clean.</p>':`<p>Something old is still here. Exploring takes 2 days.</p><div class="row">${btn('explore','Explore the ruins',null,false,true)}</div>`}</div>`;
@@ -379,7 +387,7 @@ function renderTalk(){
 function renderTrade(){
  const need=Math.floor(G.fuelMax-G.fuel),n=Math.min(need,Math.floor(G.credits/3));
  let h=`<h2>Ossiri toll ring</h2><p class="quote">State your cargo. State your credit. Do not state your feelings.</p>`;
- h+=`<div class="card"><h3>Sell</h3><p>Minerals in hold: ${G.min}. The ring pays 5 credits each.</p>${btn('sell',`Sell all for ${G.min*5} credits`,null,!G.min,true)}</div>`;
+ h+=`<div class="card"><h3>Sell</h3><p>Minerals in hold: ${G.min}. The ring pays ${PRICE} credits each.</p>${btn('sell',`Sell all for ${G.min*PRICE} credits`,null,!G.min,true)}</div>`;
  h+=`<div class="card"><h3>Supplies</h3><p>Fuel is 3 credits a unit. Crew sign on for 10 credits each.</p><div class="row">${btn('fuel',n>0?`Buy ${n} fuel for ${n*3} cr`:'Tanks full',null,n<=0)}${btn('hire','Hire 1 crew','10',G.crew>=G.crewMax||G.credits<10)}${btn('hirefull','Hire to full','10',G.crew>=G.crewMax||G.credits<10)}</div></div>`;
  h+=`<div class="card"><h3>Star charts</h3>${G.flags.charts?'<p class="sub">Your charts are up to date.</p>':`<p>Marks every homeworld and toll ring on your chart.</p>${btn('charts','Buy charts for 80 cr',null,G.credits<80)}`}</div>`;
  h+=`<div class="card"><h3>Refits</h3>${UPS.map(u=>`<div class="planet"><div><b>${esc(u.name)}</b><br><span class="sub">${esc(u.desc)}</span></div>${G.ups.includes(u.id)?'<span class="sub">Installed</span>':btn('up',`${u.cost} cr`,u.id,G.credits<u.cost)}</div>`).join('')}</div>`;
@@ -417,7 +425,7 @@ const AW=1600,AH=1600,PL={x:800,y:800,r:58};
 const TY={
  player:{r:14,turn:4.4,acc:300,maxV:330,cd:.16,col:CORAL},
  ally:{r:13,crew:10,turn:3.4,acc:250,maxV:300,cd:.45,range:460,col:'#2f6f9f'},
- scout:{r:11,crew:3,turn:3.1,acc:220,maxV:270,cd:1.4,range:420,col:BLOOM},
+ scout:{r:11,crew:3,turn:3.1,acc:220,maxV:270,cd:1.9,range:420,col:BLOOM},
  drifter:{r:15,crew:8,turn:2.6,acc:190,maxV:250,cd:.6,range:460,col:'#5d6472'},
  thrask:{r:16,crew:14,turn:3.8,acc:300,maxV:350,cd:.8,range:430,col:'#a8323e'},
  heart:{r:66,crew:70,turn:.45,acc:0,maxV:0,cd:2.4,range:0,col:BLOOM}
@@ -497,7 +505,7 @@ function upCombat(dt){
   if(v.d<m){const nx=v.dx/v.d,ny=v.dy/v.d,o=(m-v.d)/2,ah=a.type==='heart',bh=b.type==='heart';
    if(!ah){a.x-=nx*o*(bh?2:1);a.y-=ny*o*(bh?2:1);wrapP(a)}if(!bh){b.x+=nx*o*(ah?2:1);b.y+=ny*o*(ah?2:1);wrapP(b)}
    const rv=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;if(rv<0){const im=-rv*.9;if(!ah){a.vx-=nx*im;a.vy-=ny*im}if(!bh){b.vx+=nx*im;b.vy+=ny*im}}
-   if(a.hit<=0&&b.hit<=0){dmg(a,b.type==='scout'||bh?2:1);dmg(b,a.type==='scout'||ah?2:1);a.hit=b.hit=.45}}}
+   if(a.hit<=0&&b.hit<=0){dmg(a,bh?2:1);dmg(b,ah?2:1);a.hit=b.hit=.45}}}
  for(const b of C.shots){
   b.life-=dt;
   if(b.kind==='seeker'){let tg=null,best=900;for(const o of C.ships)if(o.side!==b.side&&!o.dead){const d=rel(b,o).d;if(d<best){best=d;tg=o}}
@@ -520,8 +528,8 @@ function endFight(res){
  G.crew=Math.max(0,Math.ceil(p.crew));if(o.nonLethal)G.crew=Math.max(2,G.crew);
  C=null;document.body.classList.remove('combat');for(const kk in keys)keys[kk]=false;
  if(res==='win'){const t=[];
-  if(k.scout){const m=Math.min(k.scout*4,G.cargo-G.min);G.min+=m;if(m)t.push(`${m} minerals of grey residue`)}
-  if(k.drifter){G.credits+=k.drifter*70;t.push(`${k.drifter*70} credits from the wrecks`)}
+  if(k.scout){const m=Math.min(k.scout*6,G.cargo-G.min);G.min+=m;if(m)t.push(`${m} minerals of grey residue`)}
+  if(k.drifter){G.credits+=k.drifter*90;t.push(`${k.drifter*90} credits from the wrecks`)}
   log(t.length?`Victory. Salvaged ${t.join(' and ')}.`:'Victory.');
   if(o.onWin)o.onWin();
  }else if(res==='flee'){G.day+=2;log('You flee into the dark and lose two days circling back.');if(o.onFlee)o.onFlee()}
